@@ -64,10 +64,10 @@ public class SearchEngineServiceImpl implements SearchEngineService  {
     }
 
     @Override
-    public void createIndex(SearchDataFactory<?> dataFactory) {
+    public  <T> void createIndex(SearchDataFactory<T>  dataFactory) {
         Class<?> dataClass = this.parseFactoryTypeClass(dataFactory.getClass());
         Map<String, SearchField> searchFiledMap = this.parseSearchFiled(dataClass);
-        List<?> datas = dataFactory.getData();
+        List<T> datas = dataFactory.getData();
 
         log.info("开始创建索引 总{}条", datas.size() );
 
@@ -84,7 +84,7 @@ public class SearchEngineServiceImpl implements SearchEngineService  {
 
             //创建字段
             for (int i=0;i< datas.size();i++){
-                Object data =  datas.get(i);
+                T data =  datas.get(i);
                 //创建文档对象
                 Document document=new Document();
                 Field[] declaredFields2 = data.getClass().getDeclaredFields();

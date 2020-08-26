@@ -1,12 +1,12 @@
 package com.weiller.search.lucene.dao;
 
-import com.weiller.search.lucene.model.Nsrxx ;
+import com.weiller.search.lucene.model.GoodsInfo;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 @Repository
-public interface NsrxxDao {
+public interface GoodsInfoDao {
 
-    List<Nsrxx> findAll();
+    List<GoodsInfo> findAll();
 }
