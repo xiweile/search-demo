@@ -18,6 +18,8 @@ import org.apache.lucene.search.highlight.*;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.document.Field.Store;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.wltea.analyzer.lucene.IKAnalyzer;
 
@@ -37,8 +39,6 @@ import java.util.Map;
 @Service
 public class SearchEngineServiceImpl implements SearchEngineService  {
 
-    private static String indexDir = "D:\\tmp\\lucene\\indexdata";
-
     //分词器
     private Analyzer analyzer = new IKAnalyzer(true);
 
@@ -50,7 +50,7 @@ public class SearchEngineServiceImpl implements SearchEngineService  {
     //索引搜索器
     private volatile IndexSearcher isSearcher;
 
-    public SearchEngineServiceImpl(){
+    public SearchEngineServiceImpl(@Value("${lucene.index-dir}") String indexDir){
         try {
             File file = new File(indexDir);
             if(!file.exists()){

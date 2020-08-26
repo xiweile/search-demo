@@ -3,7 +3,7 @@
 <mapper namespace="com.weiller.search.lucene.dao.NsrxxDao">
 
     <select id="findAll" resultType="com.weiller.search.lucene.model.Nsrxx">
-        select djxh,nsrsbh,nsrmc,fddbrxm from dj_nsrxx limit 1000
+        select djxh,nsrsbh,nsrmc,fddbrxm from dj_nsrxx limit 10000
     </select>
 
 </mapper>
