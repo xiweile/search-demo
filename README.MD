@@ -2,7 +2,7 @@
 
 ### 案例一：基于Lucene开发的简易版搜索工具
 
-功能: ik分词器、匹配高亮
+功能: 全文检索、ik分词器、匹配高亮
    
 
 使用步骤：
@@ -32,7 +32,7 @@ class SearchDemoApplicationTests {
 	@Test
 	void searchData() {
 		String[] queryFields = {"goodsName", "goodsIntro" };
-		SearchResult result = searchEngineService.searchIndex(queryFields,"陕西 李选红", 1, 10);
+		SearchResult result = searchEngineService.searchIndex(queryFields,"小米8 全网通", 1, 10);
 		List<Map<String, Object>> records = result.getRecords();
 		Long total = (Long)result.getTotal();
 
