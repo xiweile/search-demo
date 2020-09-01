@@ -6,6 +6,7 @@ import com.weiller.search.lucene.annotation.SearchField;
 import com.weiller.search.lucene.model.SearchResult;
 import com.weiller.search.lucene.service.SearchDataFactory;
 import com.weiller.search.lucene.service.SearchEngineService;
+import com.weiller.search.utils.ReflectUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
@@ -64,21 +65,21 @@ public class SearchEngineServiceImpl implements SearchEngineService  {
     }
 
     @Override
-    public  <T> void createIndex(SearchDataFactory<T>  dataFactory) {
-        Class<?> dataClass = this.parseFactoryTypeClass(dataFactory.getClass());
-        Map<String, SearchField> searchFiledMap = this.parseSearchFiled(dataClass);
-        List<T> datas = dataFactory.getData();
-
-        log.info("开始创建索引 总{}条", datas.size() );
-
-        long startTime = System.currentTimeMillis();
-
+    public  <T> void createIndex(SearchDataFactory<T> dataFactory) {
         // 定义索引操作对象
         IndexWriter indexWriter=null;
 
         IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
 
-         try {
+        try {
+            Class<?> dataClass = this.parseFactoryTypeClass(dataFactory.getClass());
+            Map<String, SearchField> searchFiledMap = this.parseSearchFiled(dataClass);
+            List<T> datas = dataFactory.getData();
+
+            log.info("开始创建索引 总{}条", datas.size() );
+
+            long startTime = System.currentTimeMillis();
+
             indexWriter = new IndexWriter(directory, indexWriterConfig);
             indexWriter.deleteAll();
 
@@ -91,25 +92,28 @@ public class SearchEngineServiceImpl implements SearchEngineService  {
                 for (Field field: declaredFields2){
                     field.setAccessible(true);
                     String name = field.getName();
+                    Object value = ReflectUtils.invokeGetter(data, name);
                     SearchField searchField = searchFiledMap.get(name);
                     org.apache.lucene.document.Field luceneFiled = null;
-
+                    if(searchField==null){
+                        continue;//忽略无注解的字段
+                    }
                     String filedName = "".equals(searchField.name())?name: searchField.name();
                     FiledType filedType = searchField.type();
-                   // boolean indexed = searchField.indexed();
+                    // boolean indexed = searchField.indexed();
                     boolean stored = searchField.stored();
                     switch (filedType){
                         case STRING:
-                            luceneFiled = new StringField(filedName,(String)field.get(data),stored? Store.YES:Store.NO);
+                            luceneFiled = new StringField(filedName,(String)(value==null?"":value),stored? Store.YES:Store.NO);
                             break;
                         case TEXT:
-                            luceneFiled = new TextField(filedName,(String)field.get(data),stored? Store.YES:Store.NO);
+                            luceneFiled = new TextField(filedName,(String)(value==null?"":value),stored? Store.YES:Store.NO);
                             break;
                         case LONG:
-                            luceneFiled = new LongPoint(filedName,(Long) field.get(data) );
+                            luceneFiled = new LongPoint(filedName,(Long) (value==null?0L:value) );
                             break;
                         case STORED:
-                            luceneFiled = new StoredField(filedName,(Long) field.get(data) );
+                            luceneFiled = new StoredField(filedName,(String)(value==null?"":value) );
                             break;
                         default:
 
@@ -149,7 +153,12 @@ public class SearchEngineServiceImpl implements SearchEngineService  {
 
         SearchResult result = new SearchResult();
         try {
-
+            if(pageIndex==0){
+                pageIndex=1;
+            }
+            if (pageSize==0){
+                pageSize=10;
+            }
             int start = (pageIndex - 1) * pageSize;
             int end = pageSize * pageIndex;
 
@@ -184,14 +193,26 @@ public class SearchEngineServiceImpl implements SearchEngineService  {
                 List<IndexableField> fields = targetDoc.getFields();
                 for (IndexableField indexableField:fields){
                     map.put(indexableField.name(), indexableField.stringValue());
-
-                    TokenStream tokenStream = TokenSources.getTokenStream(isSearcher.getIndexReader(), scoreDocs[i].doc,indexableField.name(),analyzer);
-                    TextFragment[] bestTextFragments = highlighter.getBestTextFragments(tokenStream, indexableField.stringValue(), false, 10);
-                    for (TextFragment textFragment:bestTextFragments){
-                        if ( textFragment!= null  &&  textFragment.getScore() > 0)  {
-                            map.put(indexableField.name(),textFragment.toString() ) ;
+                    //TokenStream tokenStream = TokenSources.getTokenStream(isSearcher.getIndexReader(), scoreDocs[i].doc,indexableField.name(),analyzer);
+                    TokenStream tokenStream = analyzer.tokenStream(indexableField.name(), indexableField.stringValue());
+                    // 分片段摘要
+                    TextFragment[] bestTextFragments = highlighter.getBestTextFragments(tokenStream, indexableField.stringValue(), false, 5);
+                    StringBuffer hValue = new StringBuffer();
+                    for (int j=0;j<bestTextFragments.length;j++){
+                        TextFragment textFragment = bestTextFragments[j];
+                        if ( textFragment!= null  &&  textFragment.getScore() > 0)  {//只取高亮匹配的片段
+                            hValue.append(textFragment.toString());
+                        }else{
+                            if (j>=1){//如果大于1条，后续不展示，使用省略号...
+                                hValue.append("...");
+                                break;
+                            }
                         }
                     }
+                    if (hValue.length()>0){
+                        map.put(indexableField.name(),hValue.toString() ) ;
+                    }
+
                 }
 
                 records.add(map);
@@ -200,68 +221,70 @@ public class SearchEngineServiceImpl implements SearchEngineService  {
             result.setTotal( totalHits.value);
 
         } catch ( Exception e) {
-            e.printStackTrace();
+            result.setRecords(new ArrayList<>());
+            result.setTotal( 0L);
+            log.error("查询索引失败",e);
         }
         return result;
     }
 
-     /**
+    /**
      * 刷新 IndexReader
-      */
-     private void refreshSearcher() {
-         synchronized (this){
-             try {
-                 if(ireader==null) {
-                     log.info("创建 DirectoryReader 实例");
-                     ireader = DirectoryReader.open(directory);
-                     isSearcher = new IndexSearcher(ireader);
-                 } else {
-                     // 如果 IndexReader 不为空，就使用 DirectoryReader 打开一个索引变更过的 IndexReader 类
-                     // 此时要记得把旧的索引对象关闭
-                     DirectoryReader dr = DirectoryReader.openIfChanged((DirectoryReader)ireader);
-                     if(dr!=null) {
-                         try {
-                             ireader.close();
-                         }catch (IOException e){
-                             log.error("关闭索引读取流失败",e);
-                         }
-                         log.info("索引变更，更新 DirectoryReader 实例");
-                         ireader = dr;
-                         isSearcher = new IndexSearcher(ireader);
-                     }
-                 }
+     */
+    private void refreshSearcher() {
+        synchronized (this){
+            try {
+                if(ireader==null) {
+                    log.info("创建 DirectoryReader 实例");
+                    ireader = DirectoryReader.open(directory);
+                    isSearcher = new IndexSearcher(ireader);
+                } else {
+                    // 如果 IndexReader 不为空，就使用 DirectoryReader 打开一个索引变更过的 IndexReader 类
+                    // 此时要记得把旧的索引对象关闭
+                    DirectoryReader dr = DirectoryReader.openIfChanged((DirectoryReader)ireader);
+                    if(dr!=null) {
+                        try {
+                            ireader.close();
+                        }catch (IOException e){
+                            log.error("关闭索引读取流失败",e);
+                        }
+                        log.info("索引变更，更新 DirectoryReader 实例");
+                        ireader = dr;
+                        isSearcher = new IndexSearcher(ireader);
+                    }
+                }
 
-             } catch (IndexNotFoundException e1){
-                 log.error("无索引文件异常",e1);
-             } catch (CorruptIndexException e2) {
-                 log.error("查询索引异常",e2);
-             } catch (IOException e3) {
-                 log.error("查询索引异常",e3);
-             }
+            } catch (IndexNotFoundException e1){
+                log.error("无索引文件异常",e1);
+            } catch (CorruptIndexException e2) {
+                log.error("查询索引异常",e2);
+            } catch (IOException e3) {
+                log.error("查询索引异常",e3);
+            }
 
-         }
+        }
     }
 
 
     @PreDestroy
     private void close(){
 
-         if (ireader!=null){
-             log.info("释放 DirectoryReader 资源");
-             try {
-                 ireader.close();
-             } catch (IOException e) {
-                 e.printStackTrace();
-             }
-         }
-         if (directory!=null){
-             log.info("释放 Directory 资源");
-             try {
-                 directory.close();
-             } catch (IOException e) {
-                 e.printStackTrace();
-             }
-         }
+        if (ireader!=null){
+            log.info("释放 DirectoryReader 资源");
+            try {
+                ireader.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        if (directory!=null){
+            log.info("释放 Directory 资源");
+            try {
+                directory.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /**

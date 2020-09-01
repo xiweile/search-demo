@@ -22,6 +22,6 @@ public class GoodsInfo {
     @SearchField(name = "stockNum",type = FiledType.STRING)
     private String stockNum;
 
-    @SearchField(name = "goodsCoverImg",type = FiledType.STRING,stored = false)
+    @SearchField(name = "goodsCoverImg",type = FiledType.STORED)
     private String goodsCoverImg;
 }

@@ -89,11 +89,22 @@
 			<version>8.0.0</version>
 		</dependency>
 		<!--lucene-->
+
+		<!-- 分词 -->
 		<dependency>
 			<groupId>com.jianggujin</groupId>
 			<artifactId>IKAnalyzer-lucene</artifactId>
 			<version>8.0.0</version>
 		</dependency>
+		<!-- 分词 -->
+
+		<!-- html解析 -->
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.13.1</version>
+		</dependency>
+		<!-- html解析 -->
 
 		<dependency>
 			<groupId>commons-io</groupId>
