@@ -16,6 +16,9 @@ import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.search.highlight.*;
+import org.apache.lucene.search.spell.DirectSpellChecker;
+import org.apache.lucene.search.spell.SpellChecker;
+import org.apache.lucene.search.spell.SuggestWord;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.document.Field.Store;
@@ -227,6 +230,43 @@ public class SearchEngineServiceImpl implements SearchEngineService  {
         }
         return result;
     }
+
+    public String[] checkWords(String field,String words){
+        List<String> results = new ArrayList<>();
+        refreshSearcher();
+        //创建拼写检查器，利用现有的索引
+        DirectSpellChecker spellChecker = new DirectSpellChecker();
+        Term term = new Term(field,words);
+        try {
+            SuggestWord[] suggestWords = spellChecker.suggestSimilar(term, 3, ireader);
+            for (SuggestWord suggestWord:suggestWords){
+                results.add(suggestWord.string);
+            }
+        } catch (IOException e) {
+            log.error("拼写检查失败", e);
+        }
+
+        return results.toArray(new String[]{});
+    }
+
+    public String[] checkWordsByAnalyze(String field,String words){
+        List<String> results = new ArrayList<>();
+        refreshSearcher();
+        //创建拼写检查器，利用现有的索引
+        DirectSpellChecker spellChecker = new DirectSpellChecker();
+        Term term = new Term(field,words);
+        try {
+            SuggestWord[] suggestWords = spellChecker.suggestSimilar(term, 3, ireader);
+            for (SuggestWord suggestWord:suggestWords){
+                results.add(suggestWord.string);
+            }
+        } catch (IOException e) {
+            log.error("拼写检查失败", e);
+        }
+
+        return results.toArray(new String[]{});
+    }
+
 
     /**
      * 刷新 IndexReader

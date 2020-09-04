@@ -88,6 +88,11 @@
 			<artifactId>lucene-highlighter</artifactId>
 			<version>8.0.0</version>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.lucene</groupId>
+			<artifactId>lucene-suggest</artifactId>
+			<version>8.0.0</version>
+		</dependency>
 		<!--lucene-->
 
 		<!-- 分词 -->
